@@ -1,0 +1,44 @@
+#!/bin/bash
+
+LOGFILE=/var/log/create_users.log
+
+logmsg () {
+    echo "$1" >> "$LOGFILE"
+}
+
+cd /users
+
+for pubfile in *.pub
+do
+    [[ -f "$pubfile" ]] || continue
+    
+    logmsg "Processing $pubfile."
+
+    user="${pubfile%.pub}"
+    home="/home/$user"
+    shell="/bin/bash"
+
+    if getent passwd "$user"
+    then
+        logmsg "User $user already exists. System account?"
+        home="$(getent passwd "$user" | cut -d ":" -f 6)"
+    else
+        logmsg "Creating user $user."
+        adduser -D -h "$home" "$user"
+    fi
+
+    chsh "$shell" "$user"
+    passwd -u "$user"
+
+    mkdir "$home/.ssh"
+    chmod 700 "$home/.ssh/"
+
+    cp "$pubfile" "$home/.ssh/authorized_keys"
+    chmod 600 "$home/.ssh/authorized_keys"
+    
+    chown -R "$user:$user" "$home"
+
+    logmsg "User $user configured."
+done
+
+logmsg "All users added."
